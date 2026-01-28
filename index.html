@@ -1,0 +1,283 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>金星の満ち欠けシミュレーター v2.4.2</title>
+    <style>
+        body { font-family: sans-serif; background: #000; color: white; margin: 0; overflow: hidden; }
+        canvas { display: block; background: #000510; touch-action: none; }
+        .ui-panel { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.9); padding: 12px; border-radius: 10px; border: 1px solid #444; z-index: 100; width: 230px; }
+        .time-panel { position: absolute; bottom: 20px; left: 10px; background: rgba(0,0,0,0.9); padding: 10px; border-radius: 10px; border: 1px solid #444; z-index: 100; }
+        .view-panel { position: absolute; bottom: 20px; right: 20px; background: #000; padding: 12px; border-radius: 10px; border: 2px solid #444; text-align: center; width: 360px; z-index: 110; }
+        .cross-layout { display: grid; grid-template-areas: ". up ." "left . right" ". down ."; gap: 5px; justify-items: center; }
+        .cross-layout button { padding: 5px; font-size: 0.75rem; min-width: 60px; }
+        .btn-up { grid-area: up; } .btn-down { grid-area: down; } .btn-left { grid-area: left; } .btn-right { grid-area: right; }
+        .control-group { margin-bottom: 12px; border-bottom: 1px solid #333; padding-bottom: 8px; }
+        #time-display { color: #ffff00; font-weight: bold; font-size: 0.9rem; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        button { background: #333; color: white; border: 1px solid #666; padding: 8px; cursor: pointer; border-radius: 4px; }
+        button.active { background: #550000; border-color: #f33; }
+        button.sun-active { background: #885500; border-color: #ffaa00; }
+        #view-canvas { border: 1px solid #333; margin-top: 5px; border-radius: 5px; background: #000; width: 340px; height: 160px; }
+        .phase-display { text-align: center; margin-top: 5px; color: #00ffff; font-weight: bold; font-size: 1.1rem; }
+        .distance-display { text-align: center; font-size: 0.85rem; color: #ffaa00; margin-top: 5px; }
+        .version-tag { position: absolute; top: 5px; right: 10px; font-size: 0.65rem; color: #666; }
+    </style>
+</head>
+<body>
+
+
+<div class="ui-panel">
+    <div class="version-tag">v2.4.2</div>
+    <h3 style="margin:0 0 10px 0; font-size: 0.95rem;">金星の満ち欠け学習</h3>
+    <div class="control-group">
+        <div style="display:flex; justify-content:space-between;"><label style="font-size:0.75rem;">向き:</label><div id="time-display">昼間 (12:00)</div></div>
+        <input type="range" id="person-pos" min="0" max="360" value="0">
+    </div>
+    <div class="control-group">
+        <button id="auto-btn" style="width:100%; font-size:0.8rem; margin-bottom:5px;">自動公転: OFF</button>
+        <button id="sun-toggle-btn" style="width:100%; font-size:0.8rem;">太陽の位置表示: OFF</button>
+        <div id="phase-text" class="phase-display">--</div>
+        <div id="dist-text" class="distance-display">距離: -- km</div>
+    </div>
+</div>
+
+
+<div class="time-panel">
+    <div class="cross-layout">
+        <button class="btn-up" onclick="setTime(90)">18:00<br>夕方</button>
+        <button class="btn-left" onclick="setTime(180)">24:00<br>真夜中</button>
+        <button class="btn-right" onclick="setTime(0)">12:00<br>昼間</button>
+        <button class="btn-down" onclick="setTime(270)">06:00<br>明け方</button>
+    </div>
+</div>
+
+
+<div class="view-panel">
+    <div style="font-size: 0.75rem; color: #ccc;">地上から見た空（南向き）</div>
+    <canvas id="view-canvas" width="340" height="160"></canvas>
+    <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:#aaa; padding:0 10px;">
+        <span>東</span><span>南（正面）</span><span>西</span>
+    </div>
+</div>
+
+
+<canvas id="mainCanvas"></canvas>
+
+
+<script>
+const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
+const vCanvas = document.getElementById('view-canvas'), vCtx = vCanvas.getContext('2d');
+
+
+let isAutoOrbit = false;
+let showSunInView = false;
+let venusAngle = 0; 
+let personAngle = 0; 
+let orbitSpeed = 0.01;
+
+
+const sunPos = { x: 80, y: 0 }; 
+const earthPos = { x: -280, y: 0 }; 
+const orbitRadius = 180; 
+const earthR = 50;
+const venusBaseR = 16;
+const AU_KM = 149600000;
+
+
+function setTime(val) {
+    document.getElementById('person-pos').value = val;
+    personAngle = -(val * Math.PI / 180);
+    const td = document.getElementById('time-display');
+    if (val < 45 || val >= 315) td.innerText = "昼間 (12:00)";
+    else if (val >= 45 && val < 110) td.innerText = "夕方 (18:00)";
+    else if (val >= 110 && val < 230) td.innerText = "真夜中 (24:00)";
+    else td.innerText = "明け方 (06:00)";
+}
+
+
+function init() {
+    window.addEventListener('resize', resize); resize();
+    document.getElementById('person-pos').oninput = function() { setTime(parseInt(this.value)); };
+    document.getElementById('auto-btn').onclick = function() { 
+        isAutoOrbit = !isAutoOrbit; this.innerText = `自動公転: ${isAutoOrbit ? 'ON' : 'OFF'}`;
+        this.classList.toggle('active', isAutoOrbit);
+    };
+    document.getElementById('sun-toggle-btn').onclick = function() {
+        showSunInView = !showSunInView; this.innerText = `太陽の位置表示: ${showSunInView ? 'ON' : 'OFF'}`;
+        this.classList.toggle('sun-active', showSunInView);
+    };
+
+
+    const handlePointer = (e) => {
+        if (e.buttons > 0) {
+            const rect = canvas.getBoundingClientRect();
+            const centerX = canvas.width / 2 + sunPos.x;
+            const centerY = canvas.height / 2 + sunPos.y;
+            const mouseX = e.clientX - rect.left - centerX;
+            const mouseY = e.clientY - rect.top - centerY;
+            venusAngle = Math.atan2(mouseY, mouseX);
+        }
+    };
+    canvas.addEventListener('pointerdown', handlePointer);
+    canvas.addEventListener('pointermove', handlePointer);
+    requestAnimationFrame(update);
+}
+
+
+function update() {
+    if (isAutoOrbit) { venusAngle -= orbitSpeed; }
+    draw();
+    drawGroundView();
+    requestAnimationFrame(update);
+}
+
+
+function drawVenusObject(targetCtx, r, phaseAngle, isSpaceView, rotation = 0, isSun = false) {
+    targetCtx.save();
+    if (rotation !== 0) targetCtx.rotate(rotation);
+    if (isSun) {
+        targetCtx.fillStyle = "#ffcc00";
+        targetCtx.shadowBlur = 15;
+        targetCtx.shadowColor = "#ffaa00";
+        targetCtx.beginPath(); targetCtx.arc(0, 0, r, 0, Math.PI * 2); targetCtx.fill();
+        targetCtx.restore();
+        return;
+    }
+    const s = Math.cos(phaseAngle); 
+    const isLeftLight = Math.sin(phaseAngle) < 0;
+    targetCtx.beginPath(); targetCtx.arc(0, 0, r, 0, Math.PI * 2);
+    targetCtx.fillStyle = "#111"; targetCtx.fill();
+    if (isSpaceView) {
+        targetCtx.beginPath(); targetCtx.arc(0, 0, r, -Math.PI/2, Math.PI/2, false);
+        targetCtx.fillStyle = "#eee"; targetCtx.fill();
+    } else {
+        targetCtx.beginPath(); targetCtx.arc(0, 0, r, -Math.PI/2, Math.PI/2, isLeftLight);
+        targetCtx.fillStyle = "#eee"; targetCtx.fill();
+        targetCtx.beginPath(); targetCtx.ellipse(0, 0, r * Math.abs(s), r, 0, 0, Math.PI * 2);
+        targetCtx.fillStyle = s > 0 ? "#111" : "#eee"; targetCtx.fill();
+    }
+    targetCtx.restore();
+}
+
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const centerX = canvas.width / 2 + sunPos.x;
+    const centerY = canvas.height / 2 + sunPos.y;
+    ctx.fillStyle = "#ffcc00"; ctx.beginPath(); ctx.arc(centerX, centerY, 50, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.beginPath(); ctx.arc(centerX, centerY, orbitRadius, 0, Math.PI*2); ctx.stroke();
+    const vx = centerX + Math.cos(venusAngle) * orbitRadius;
+    const vy = centerY + Math.sin(venusAngle) * orbitRadius;
+    const ex = canvas.width / 2 + earthPos.x;
+    const ey = canvas.height / 2 + earthPos.y;
+    ctx.save();
+    ctx.translate(ex, ey);
+    ctx.fillStyle = '#1e90ff'; ctx.beginPath(); ctx.arc(0, 0, earthR, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.beginPath(); ctx.arc(0, 0, earthR + 0.5, Math.PI/2, 3*Math.PI/2, false); ctx.fill();
+    ctx.save();
+    ctx.rotate(personAngle);
+    const dx = vx - ex; const dy = vy - ey;
+    const relX = dx * Math.cos(-personAngle) - dy * Math.sin(-personAngle);
+    const relY = dx * Math.sin(-personAngle) + dy * Math.cos(-personAngle);
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.beginPath(); ctx.moveTo(earthR, 0); ctx.lineTo(relX, relY); ctx.stroke(); ctx.setLineDash([]);
+    ctx.translate(earthR, 0);
+    ctx.strokeStyle = "yellow"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25, 0); ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(0, 40); ctx.stroke();
+    ctx.fillStyle = "#00ff00"; ctx.font = "bold 12px sans-serif"; ctx.textAlign = "center";
+    ctx.save(); ctx.translate(0, -50); ctx.rotate(Math.PI/2); ctx.fillText("東", 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(0, 50); ctx.rotate(Math.PI/2); ctx.fillText("西", 0, 0); ctx.restore();
+    ctx.rotate(Math.PI/2); ctx.strokeStyle = "white"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(0, -12, 3, 0, Math.PI*2); ctx.moveTo(0, -9); ctx.lineTo(0, -3); 
+    ctx.moveTo(-4, -7); ctx.lineTo(4, -7); ctx.moveTo(0, -3); ctx.lineTo(-3, 0); ctx.moveTo(0, -3); ctx.lineTo(3, 0); ctx.stroke();
+    ctx.restore(); ctx.restore(); ctx.restore();
+    ctx.save(); ctx.translate(vx, vy); drawVenusObject(ctx, venusBaseR, 0, true); ctx.restore();
+    let pText = "";
+    const deg = ((venusAngle * 180 / Math.PI % 360) + 360) % 360;
+    if (deg > 345 || deg < 15) pText = "外合";
+    else if (deg >= 15 && deg < 165) pText = "明けの明星";
+    else if (deg >= 165 && deg < 195) pText = "内合";
+    else pText = "よいの明星";
+    document.getElementById('phase-text').innerText = pText;
+}
+
+
+function drawGroundView() {
+    vCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
+    const a = (parseInt(document.getElementById('person-pos').value) % 360 + 360) % 360;
+    let sky = "#000015";
+    if (a < 35 || a > 325) sky = "#4488ff"; 
+    else if (a < 65) sky = "#cc4422"; 
+    else if (a < 110) sky = "#442244"; 
+    else if (a < 250) sky = "#000015"; 
+    else if (a < 290) sky = "#442266"; 
+    else sky = "#6655aa";
+    vCanvas.style.background = sky;
+
+
+    const ex = canvas.width / 2 + earthPos.x;
+    const ey = canvas.height / 2 + earthPos.y;
+    const sunDX = (canvas.width / 2 + sunPos.x) - ex;
+    const sunDY = (canvas.height / 2 + sunPos.y) - ey;
+    const sunDist = Math.sqrt(sunDX*sunDX + sunDY*sunDY);
+    const sunAngleFromEarth = Math.atan2(sunDY, sunDX);
+
+
+    const vx = canvas.width / 2 + sunPos.x + Math.cos(venusAngle) * orbitRadius;
+    const vy = canvas.height / 2 + sunPos.y + Math.sin(venusAngle) * orbitRadius;
+    const dx = vx - ex; const dy = vy - ey;
+    const venusDist = Math.sqrt(dx*dx + dy*dy);
+    const venusAngleFromEarth = Math.atan2(dy, dx);
+
+
+    document.getElementById('dist-text').innerText = `距離: ${Math.floor((venusDist / 100) * AU_KM).toLocaleString()} km`;
+
+
+    // 描画オブジェクトを距離（Z値）でソートするためのリスト
+    let drawQueue = [];
+    
+    // 太陽の追加判定
+    if (showSunInView) {
+        let sDiff = sunAngleFromEarth - personAngle;
+        while (sDiff < -Math.PI) sDiff += Math.PI * 2;
+        while (sDiff > Math.PI) sDiff -= Math.PI * 2;
+        if (Math.abs(sDiff) < Math.PI / 2) {
+            drawQueue.push({ type: 'sun', dist: sunDist, diff: sDiff });
+        }
+    }
+
+
+    // 金星の追加判定
+    let vDiff = venusAngleFromEarth - personAngle;
+    while (vDiff < -Math.PI) vDiff += Math.PI * 2;
+    while (vDiff > Math.PI) vDiff -= Math.PI * 2;
+    if (Math.abs(vDiff) < Math.PI / 2) {
+        drawQueue.push({ type: 'venus', dist: venusDist, diff: vDiff });
+    }
+
+
+    // 距離が遠い順にソート（遠いものから先に描く）
+    drawQueue.sort((a, b) => b.dist - a.dist);
+
+
+    drawQueue.forEach(obj => {
+        const x = vCanvas.width / 2 + Math.sin(obj.diff) * (vCanvas.width / 2 * 1.1);
+        const y = vCanvas.height - Math.cos(obj.diff) * 100;
+        if (obj.type === 'sun') {
+            vCtx.save(); vCtx.translate(x, y); drawVenusObject(vCtx, 15, 0, false, 0, true); vCtx.restore();
+        } else {
+            const displayR = 4000 / obj.dist;
+            const phaseAngle = venusAngle - venusAngleFromEarth + Math.PI;
+            vCtx.save(); vCtx.translate(x, y); drawVenusObject(vCtx, displayR, phaseAngle, false, obj.diff); vCtx.restore();
+        }
+    });
+}
+
+
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+init();
+</script>
+</body>
+</html>
