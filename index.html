@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>惑星シミュレーター v2.6.0</title>
+    <title>天体シミュレーター v2.6.1</title>
     <style>
         body { font-family: sans-serif; background: #000; color: white; margin: 0; overflow: hidden; }
         canvas { display: block; background: #000510; touch-action: none; }
@@ -26,9 +26,8 @@
 </head>
 <body>
 
-
 <div class="ui-panel">
-    <div class="version-tag">v2.6.0</div>
+    <div class="version-tag">v2.6.1</div>
     <h3 style="margin:0 0 10px 0; font-size: 0.95rem;">天体の満ち欠け学習</h3>
     <div class="control-group">
         <div style="display:flex; justify-content:space-between;"><label style="font-size:0.75rem;">向き:</label><div id="time-display">昼間 (12:00)</div></div>
@@ -42,7 +41,6 @@
     </div>
 </div>
 
-
 <div class="time-panel">
     <div class="cross-layout">
         <button class="btn-up" onclick="setTime(90)">18:00<br>夕方</button>
@@ -52,7 +50,6 @@
     </div>
 </div>
 
-
 <div class="view-panel">
     <div style="font-size: 0.75rem; color: #ccc;">地上から見た空（南向き）</div>
     <canvas id="view-canvas" width="340" height="160"></canvas>
@@ -61,20 +58,16 @@
     </div>
 </div>
 
-
 <canvas id="mainCanvas"></canvas>
-
 
 <script>
 const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d');
 const vCanvas = document.getElementById('view-canvas'), vCtx = vCanvas.getContext('2d');
 
-
 let isAutoOrbit = false, showSunInView = false, showMars = false;
 let venusAngle = 0, marsAngle = 1, personAngle = 0;
 let orbitSpeed = 0.01, marsOrbitSpeed = 0.0053;
 let earthClickCount = 0;
-
 
 const sunX = 50, sunY = 0; 
 const earthX = -380, earthY = 0; 
@@ -82,7 +75,6 @@ const orbitRadius = 180;
 const marsOrbitRadius = 600; 
 const earthR = 50, venusBaseR = 16, marsBaseR = 14;
 const AU_KM = 149600000;
-
 
 function setTime(val) {
     document.getElementById('person-pos').value = val;
@@ -93,7 +85,6 @@ function setTime(val) {
     else if (val >= 110 && val < 230) td.innerText = "真夜中 (24:00)";
     else td.innerText = "明け方 (06:00)";
 }
-
 
 function init() {
     window.addEventListener('resize', resize); resize();
@@ -107,16 +98,13 @@ function init() {
         this.classList.toggle('sun-active', showSunInView);
     };
 
-
     let draggingTarget = null;
-
 
     canvas.addEventListener('pointerdown', (e) => {
         const rect = canvas.getBoundingClientRect();
         const scale = showMars ? 0.6 : 1.0;
         const mx = (e.clientX - rect.left - canvas.width/2) / scale;
         const my = (e.clientY - rect.top - canvas.height/2) / scale;
-
 
         const distToEarth = Math.sqrt((mx - earthX)**2 + (my - earthY)**2);
         if (distToEarth < earthR && mx < earthX) {
@@ -125,7 +113,6 @@ function init() {
             return;
         }
 
-
         const vx = sunX + Math.cos(venusAngle) * orbitRadius, vy = sunY + Math.sin(venusAngle) * orbitRadius;
         if (Math.sqrt((mx - vx)**2 + (my - vy)**2) < 30) { draggingTarget = 'venus'; return; }
         if (showMars) {
@@ -133,7 +120,6 @@ function init() {
             if (Math.sqrt((mx - marsX)**2 + (my - marsY)**2) < 30) { draggingTarget = 'mars'; return; }
         }
     });
-
 
     window.addEventListener('pointermove', (e) => {
         if (!draggingTarget) return;
@@ -146,11 +132,9 @@ function init() {
         else if (draggingTarget === 'mars') marsAngle = ang;
     });
 
-
     window.addEventListener('pointerup', () => { draggingTarget = null; });
     requestAnimationFrame(update);
 }
-
 
 function update() {
     if (isAutoOrbit) { venusAngle -= orbitSpeed; marsAngle -= marsOrbitSpeed; }
@@ -158,7 +142,6 @@ function update() {
     drawGroundView();
     requestAnimationFrame(update);
 }
-
 
 function drawPlanetObject(targetCtx, r, phaseAngle, isSpaceView, rotation = 0, type = 'venus', planetAngle = 0) {
     targetCtx.save();
@@ -169,10 +152,8 @@ function drawPlanetObject(targetCtx, r, phaseAngle, isSpaceView, rotation = 0, t
         targetCtx.restore(); return;
     }
 
-
     const baseColor = type === 'mars' ? "#441111" : "#111";
     const lightColor = type === 'mars' ? "#ff5533" : "#eee";
-
 
     if (isSpaceView) {
         targetCtx.rotate(planetAngle + Math.PI);
@@ -190,7 +171,6 @@ function drawPlanetObject(targetCtx, r, phaseAngle, isSpaceView, rotation = 0, t
     targetCtx.restore();
 }
 
-
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     const scale = showMars ? 0.6 : 1.0;
@@ -199,7 +179,6 @@ function draw() {
     ctx.translate(canvas.width/2, canvas.height/2);
     ctx.scale(scale, scale);
 
-
     ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.lineWidth = 1/scale;
     ctx.beginPath(); ctx.arc(sunX, sunY, orbitRadius, 0, Math.PI*2); ctx.stroke();
     if (showMars) {
@@ -207,13 +186,10 @@ function draw() {
         ctx.beginPath(); ctx.arc(sunX, sunY, marsOrbitRadius, 0, Math.PI*2); ctx.stroke();
     }
 
-
     ctx.save(); ctx.translate(sunX, sunY); drawPlanetObject(ctx, 50, 0, true, 0, 'sun'); ctx.restore();
-
 
     const vx = sunX + Math.cos(venusAngle)*orbitRadius, vy = sunY + Math.sin(venusAngle)*orbitRadius;
     const mx = sunX + Math.cos(marsAngle)*marsOrbitRadius, my = sunY + Math.sin(marsAngle)*marsOrbitRadius;
-
 
     ctx.save();
     ctx.translate(earthX, earthY);
@@ -236,20 +212,16 @@ function draw() {
     }
     ctx.setLineDash([]);
 
-
-    // 観測者人形と方位の復元
     ctx.translate(earthR, 0); 
     ctx.strokeStyle = "yellow"; ctx.lineWidth = 3/scale; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(25/scale, 0); ctx.stroke();
     
     ctx.save();
     ctx.rotate(Math.PI/2);
     ctx.strokeStyle = "white"; ctx.lineWidth = 1.5/scale;
-    // 人形描画
-    ctx.beginPath(); ctx.arc(0, -12/scale, 3/scale, 0, Math.PI*2); ctx.stroke(); // 頭
-    ctx.beginPath(); ctx.moveTo(0, -9/scale); ctx.lineTo(0, -3/scale); ctx.stroke(); // 胴体
-    ctx.beginPath(); ctx.moveTo(-4/scale, -7/scale); ctx.lineTo(4/scale, -7/scale); ctx.stroke(); // 腕
+    ctx.beginPath(); ctx.arc(0, -12/scale, 3/scale, 0, Math.PI*2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -9/scale); ctx.lineTo(0, -3/scale); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-4/scale, -7/scale); ctx.lineTo(4/scale, -7/scale); ctx.stroke();
     ctx.restore();
-
 
     ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.lineWidth = 1/scale;
     ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(0, 40); ctx.stroke();
@@ -258,7 +230,6 @@ function draw() {
     ctx.save(); ctx.translate(0, 50); ctx.rotate(Math.PI/2); ctx.fillText("西", 0, 0); ctx.restore();
     ctx.restore(); ctx.restore();
 
-
     ctx.save(); ctx.translate(vx, vy); drawPlanetObject(ctx, venusBaseR, 0, true, 0, 'venus', venusAngle); ctx.restore();
     if (showMars) {
         ctx.save(); ctx.translate(mx, my); drawPlanetObject(ctx, marsBaseR, 0, true, 0, 'mars', marsAngle); ctx.restore();
@@ -266,11 +237,9 @@ function draw() {
     
     ctx.restore();
 
-
-    const degV = (venusAngle * 180 / Math.PI % 360 + 360) % 360;
-    document.getElementById('phase-text').innerText = (degV > 180) ? "明けの明星" : "よいの明星";
+    // 明星の判定: ラジアン角が負（画面上半分）なら「よいの明星」
+    document.getElementById('phase-text').innerText = (Math.sin(venusAngle) < 0) ? "よいの明星" : "明けの明星";
 }
-
 
 function drawGroundView() {
     vCtx.clearRect(0, 0, vCanvas.width, vCanvas.height);
@@ -283,7 +252,6 @@ function drawGroundView() {
     else if (deg < 290) sky = "#442266"; 
     else sky = "#6655aa";
     vCanvas.style.background = sky;
-
 
     let queue = [];
     if (showSunInView) {
@@ -298,14 +266,12 @@ function drawGroundView() {
     let vDiff = vAng - personAngle; while (vDiff < -Math.PI) vDiff += Math.PI * 2; while (vDiff > Math.PI) vDiff -= Math.PI * 2;
     if (Math.abs(vDiff) < Math.PI / 2) queue.push({ type: 'venus', dist: vDist, diff: vDiff, ang: vAng, pAng: venusAngle });
 
-
     if (showMars) {
         const mdx = sunX + Math.cos(marsAngle)*marsOrbitRadius - earthX, mdy = sunY + Math.sin(marsAngle)*marsOrbitRadius - earthY;
         const mAng = Math.atan2(mdy, mdx), mDist = Math.sqrt(mdx*mdx + mdy*mdy);
         let mDiff = mAng - personAngle; while (mDiff < -Math.PI) mDiff += Math.PI * 2; while (mDiff > Math.PI) mDiff -= Math.PI * 2;
         if (Math.abs(mDiff) < Math.PI / 2) queue.push({ type: 'mars', dist: mDist, diff: mDiff, ang: mAng, pAng: marsAngle });
     }
-
 
     queue.sort((a, b) => b.dist - a.dist).forEach(obj => {
         const x = vCanvas.width / 2 + Math.sin(obj.diff) * (vCanvas.width / 2 * 1.1);
@@ -316,7 +282,6 @@ function drawGroundView() {
         vCtx.restore();
     });
 }
-
 
 function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 init();
